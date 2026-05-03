@@ -42,7 +42,9 @@ function detectColumnsFromContent(rows: any[][]): { num: number; name: number; d
       if (raw === undefined || raw === null || raw.toString().trim() === '') continue;
       const v = raw.toString().trim();
       stats[c].total++;
-      if (/^\d{3,10}$/.test(v)) stats[c].accountCode++;
+      // Account code: digits with optional separators ( - . / ), total digit length 3-12
+      const digitsOnly = v.replace(/[^\d]/g, '');
+      if (/^[\d\-./]+$/.test(v) && digitsOnly.length >= 3 && digitsOnly.length <= 12) stats[c].accountCode++;
       const cleaned = v.replace(/,/g, '');
       if (!isNaN(parseFloat(cleaned)) && /^[-(]?[\d,]+\.?\d*\)?$/.test(v)) {
         stats[c].numeric++;
@@ -133,8 +135,9 @@ function parseFile(file: File): Promise<AccountEntry[]> {
         .filter(row => row && (row[nameIdx]?.toString().trim() || (numIdx >= 0 && row[numIdx]?.toString().trim())))
         .map((row, i) => {
           const rawNum = numIdx >= 0 ? row[numIdx]?.toString().trim() : undefined;
-          // Only treat as account number if it looks like a code (digits only, length 2-12)
-          const number = rawNum && /^\d{2,12}$/.test(rawNum) ? rawNum : undefined;
+          // Accept account codes with optional separators (1-101, 1.101.01, 1/101) → keep digits only
+          const digits = rawNum ? rawNum.replace(/[^\d]/g, '') : '';
+          const number = digits.length >= 2 && digits.length <= 12 ? digits : undefined;
           const name = row[nameIdx]?.toString().trim() || number || '';
           const debit = parseFloat(row[debitIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
           const credit = parseFloat(row[creditIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
