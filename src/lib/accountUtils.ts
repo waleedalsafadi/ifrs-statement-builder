@@ -234,6 +234,17 @@ export function bucketFromNumber(num?: string): Bucket {
 // ---------- Refine bucket → category by name keywords ----------
 function refineWithName(bucket: Bucket, lname: string): AccountCategory {
   switch (bucket) {
+    case 'ASSET':
+      if (hasAny(lname, KW.cash)) return 'CA_Cash';
+      if (hasAny(lname, KW.receivables)) return 'CA_Receivables';
+      if (hasAny(lname, KW.inventory)) return 'CA_Inventory';
+      if (hasAny(lname, KW.prepayments)) return 'CA_Prepayments';
+      if (hasAny(lname, KW.rou)) return 'NCA_ROU';
+      if (hasAny(lname, KW.intangible)) return 'NCA_Intangible';
+      if (hasAny(lname, KW.deferredTaxAsset)) return 'NCA_DeferredTax';
+      if (hasAny(lname, KW.longInvestment)) return 'NCA_Investment';
+      if (hasAny(lname, KW.ppe)) return 'NCA_PPE';
+      return 'NCA_Other';
     case 'NCA':
       if (hasAny(lname, KW.rou)) return 'NCA_ROU';
       if (hasAny(lname, KW.intangible)) return 'NCA_Intangible';
@@ -247,6 +258,16 @@ function refineWithName(bucket: Bucket, lname: string): AccountCategory {
       if (hasAny(lname, KW.inventory)) return 'CA_Inventory';
       if (hasAny(lname, KW.prepayments)) return 'CA_Prepayments';
       return 'CA_Other';
+    case 'LIAB':
+      if (hasAny(lname, KW.currentPortion)) return 'CL_CurrentPortionLTD';
+      if (hasAny(lname, KW.accruals)) return 'CL_Accruals';
+      if (hasAny(lname, KW.stBorrow)) return 'CL_ShortTermBorrowings';
+      if (hasAny(lname, KW.payables)) return 'CL_Payables';
+      if (hasAny(lname, KW.deferredTaxLiab)) return 'NCL_DeferredTaxLiability';
+      if (hasAny(lname, KW.leaseLiab)) return 'NCL_LeaseLiability';
+      if (hasAny(lname, KW.provisions)) return 'NCL_Provisions';
+      if (hasAny(lname, KW.ltDebt)) return 'NCL_LongTermDebt';
+      return 'CL_Other';
     case 'NCL':
       if (hasAny(lname, KW.deferredTaxLiab)) return 'NCL_DeferredTaxLiability';
       if (hasAny(lname, KW.leaseLiab)) return 'NCL_LeaseLiability';
