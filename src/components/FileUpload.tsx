@@ -11,23 +11,85 @@ interface FileUploadProps {
 
 // Header detection — supports columns in any order:
 // account number, account name, debit, credit
-function detectColumns(headerRow: any[]): { num: number; name: number; debit: number; credit: number } {
+function detectColumnsFromHeader(headerRow: any[]): { num: number; name: number; debit: number; credit: number } {
   const norm = (v: any) => (v ?? '').toString().toLowerCase().trim();
   const map: Record<string, number> = {};
   headerRow.forEach((h, i) => { map[norm(h)] = i; });
   const find = (...keys: string[]) => {
     for (const k of keys) if (k in map) return map[k];
-    // fuzzy contains
     for (const [hk, idx] of Object.entries(map)) {
-      if (keys.some(k => hk.includes(k))) return idx;
+      if (hk && keys.some(k => hk.includes(k))) return idx;
     }
     return -1;
   };
-  const num = find('account number', 'account no', 'acc no', 'acc#', 'code', 'رقم الحساب', 'رقم', 'كود');
-  const name = find('account name', 'account', 'description', 'اسم الحساب', 'الحساب', 'البيان');
+  const num = find('account number', 'account no', 'acc no', 'acc#', 'code', 'رقم الحساب', 'رقم', 'كود', 'no.', 'no');
+  const name = find('account name', 'account', 'description', 'اسم الحساب', 'الحساب', 'البيان', 'الاسم', 'name');
   const debit = find('debit', 'dr', 'مدين');
   const credit = find('credit', 'cr', 'دائن');
   return { num, name, debit, credit };
+}
+
+// Content-based detection: scan data rows to identify each column by its values
+function detectColumnsFromContent(rows: any[][]): { num: number; name: number; debit: number; credit: number } {
+  const sample = rows.slice(0, Math.min(rows.length, 30));
+  const colCount = Math.max(0, ...sample.map(r => r?.length || 0));
+  const stats = Array.from({ length: colCount }, () => ({ numeric: 0, accountCode: 0, text: 0, total: 0 }));
+
+  for (const row of sample) {
+    if (!row) continue;
+    for (let c = 0; c < colCount; c++) {
+      const raw = row[c];
+      if (raw === undefined || raw === null || raw.toString().trim() === '') continue;
+      const v = raw.toString().trim();
+      stats[c].total++;
+      if (/^\d{3,10}$/.test(v)) stats[c].accountCode++;
+      const cleaned = v.replace(/,/g, '');
+      if (!isNaN(parseFloat(cleaned)) && /^[-(]?[\d,]+\.?\d*\)?$/.test(v)) {
+        stats[c].numeric++;
+      } else if (!/^[\d.,\-()]+$/.test(v)) {
+        stats[c].text++;
+      }
+    }
+  }
+
+  let num = -1, numScore = 0;
+  stats.forEach((s, i) => {
+    if (s.total === 0) return;
+    const score = s.accountCode / s.total;
+    if (score > 0.6 && score > numScore) { numScore = score; num = i; }
+  });
+
+  let name = -1, nameScore = 0;
+  stats.forEach((s, i) => {
+    if (s.total === 0 || i === num) return;
+    const score = s.text / s.total;
+    if (score > 0.4 && score > nameScore) { nameScore = score; name = i; }
+  });
+
+  const moneyCols = stats
+    .map((s, i) => ({ i, s }))
+    .filter(({ i, s }) => i !== num && i !== name && s.total > 0 && s.numeric / s.total > 0.5)
+    .sort((a, b) => a.i - b.i);
+
+  let debit = -1, credit = -1;
+  if (moneyCols.length >= 2) {
+    debit = moneyCols[0].i;
+    credit = moneyCols[1].i;
+  } else if (moneyCols.length === 1) {
+    debit = moneyCols[0].i;
+  }
+  return { num, name, debit, credit };
+}
+
+function isHeaderRow(row: any[]): boolean {
+  if (!row) return false;
+  const cells = row.filter(c => c !== undefined && c !== null && c.toString().trim() !== '');
+  if (cells.length === 0) return false;
+  const textLike = cells.filter(c => {
+    const v = c.toString().trim();
+    return !/^[-(]?[\d,]+\.?\d*\)?$/.test(v) && !/^\d+$/.test(v);
+  }).length;
+  return textLike / cells.length >= 0.5;
 }
 
 function parseFile(file: File): Promise<AccountEntry[]> {
