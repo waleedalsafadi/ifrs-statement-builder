@@ -42,7 +42,9 @@ function detectColumnsFromContent(rows: any[][]): { num: number; name: number; d
       if (raw === undefined || raw === null || raw.toString().trim() === '') continue;
       const v = raw.toString().trim();
       stats[c].total++;
-      if (/^\d{3,10}$/.test(v)) stats[c].accountCode++;
+      // Account code: digits with optional separators ( - . / ), total digit length 3-12
+      const digitsOnly = v.replace(/[^\d]/g, '');
+      if (/^[\d\-./]+$/.test(v) && digitsOnly.length >= 3 && digitsOnly.length <= 12) stats[c].accountCode++;
       const cleaned = v.replace(/,/g, '');
       if (!isNaN(parseFloat(cleaned)) && /^[-(]?[\d,]+\.?\d*\)?$/.test(v)) {
         stats[c].numeric++;
