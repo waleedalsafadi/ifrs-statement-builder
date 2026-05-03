@@ -186,13 +186,28 @@ function hasAny(text: string, kws: string[]): boolean {
 
 // ---------- Number-prefix → broad bucket ----------
 type Bucket =
-  | 'NCA' | 'CA'
-  | 'NCL' | 'CL'
+  | 'ASSET' | 'NCA' | 'CA'
+  | 'LIAB' | 'NCL' | 'CL'
   | 'EQ' | 'REV' | 'COGS' | 'OPEX' | 'FIN' | 'TAX' | 'MEMO' | null;
 
+export function normalizeAccountNumber(value?: string): string | undefined {
+  if (!value) return undefined;
+  const normalized = value
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776))
+    .replace(/[^0-9]/g, '');
+  return normalized.length >= 1 && normalized.length <= 12 ? normalized : undefined;
+}
+
+export function extractAccountNumber(text?: string): string | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(?:^|\s)([0-9٠-٩۰-۹][0-9٠-٩۰-۹\-./]{0,14})(?=\s|$)/);
+  return normalizeAccountNumber(match?.[1]);
+}
+
 export function bucketFromNumber(num?: string): Bucket {
-  if (!num) return null;
-  const n = num.trim();
+  const n = normalizeAccountNumber(num);
+  if (!n) return null;
   if (!/^\d/.test(n)) return null;
   const d1 = n[0];
   const d2 = n[1] ?? '';
@@ -200,11 +215,11 @@ export function bucketFromNumber(num?: string): Bucket {
     case '1':
       if (d2 === '1') return 'NCA';
       if (d2 === '2') return 'CA';
-      return 'CA';
+      return 'ASSET';
     case '2':
       if (d2 === '1') return 'NCL';
       if (d2 === '2') return 'CL';
-      return 'CL';
+      return 'LIAB';
     case '3': return 'EQ';
     case '4': return 'REV';
     case '5': return 'COGS';
@@ -219,6 +234,17 @@ export function bucketFromNumber(num?: string): Bucket {
 // ---------- Refine bucket → category by name keywords ----------
 function refineWithName(bucket: Bucket, lname: string): AccountCategory {
   switch (bucket) {
+    case 'ASSET':
+      if (hasAny(lname, KW.cash)) return 'CA_Cash';
+      if (hasAny(lname, KW.receivables)) return 'CA_Receivables';
+      if (hasAny(lname, KW.inventory)) return 'CA_Inventory';
+      if (hasAny(lname, KW.prepayments)) return 'CA_Prepayments';
+      if (hasAny(lname, KW.rou)) return 'NCA_ROU';
+      if (hasAny(lname, KW.intangible)) return 'NCA_Intangible';
+      if (hasAny(lname, KW.deferredTaxAsset)) return 'NCA_DeferredTax';
+      if (hasAny(lname, KW.longInvestment)) return 'NCA_Investment';
+      if (hasAny(lname, KW.ppe)) return 'NCA_PPE';
+      return 'NCA_Other';
     case 'NCA':
       if (hasAny(lname, KW.rou)) return 'NCA_ROU';
       if (hasAny(lname, KW.intangible)) return 'NCA_Intangible';
@@ -232,6 +258,16 @@ function refineWithName(bucket: Bucket, lname: string): AccountCategory {
       if (hasAny(lname, KW.inventory)) return 'CA_Inventory';
       if (hasAny(lname, KW.prepayments)) return 'CA_Prepayments';
       return 'CA_Other';
+    case 'LIAB':
+      if (hasAny(lname, KW.currentPortion)) return 'CL_CurrentPortionLTD';
+      if (hasAny(lname, KW.accruals)) return 'CL_Accruals';
+      if (hasAny(lname, KW.stBorrow)) return 'CL_ShortTermBorrowings';
+      if (hasAny(lname, KW.payables)) return 'CL_Payables';
+      if (hasAny(lname, KW.deferredTaxLiab)) return 'NCL_DeferredTaxLiability';
+      if (hasAny(lname, KW.leaseLiab)) return 'NCL_LeaseLiability';
+      if (hasAny(lname, KW.provisions)) return 'NCL_Provisions';
+      if (hasAny(lname, KW.ltDebt)) return 'NCL_LongTermDebt';
+      return 'CL_Other';
     case 'NCL':
       if (hasAny(lname, KW.deferredTaxLiab)) return 'NCL_DeferredTaxLiability';
       if (hasAny(lname, KW.leaseLiab)) return 'NCL_LeaseLiability';
@@ -310,7 +346,8 @@ function categoryFromNameOnly(name: string): AccountCategory {
 // ---------- Public classification entry ----------
 export function classifyAccount(name: string, number?: string): AccountCategory {
   const lname = (name || '').toLowerCase();
-  const bucket = bucketFromNumber(number);
+  const detectedNumber = normalizeAccountNumber(number) ?? extractAccountNumber(name);
+  const bucket = bucketFromNumber(detectedNumber);
   if (bucket) return refineWithName(bucket, lname);
   return categoryFromNameOnly(name || '');
 }

@@ -1,7 +1,7 @@
 import { useCallback, useState } from 'react';
 import { Upload, FileSpreadsheet } from 'lucide-react';
 import * as XLSX from 'xlsx';
-import { AccountEntry, classifyAccount, categoryToType } from '@/lib/accountUtils';
+import { AccountEntry, classifyAccount, categoryToType, extractAccountNumber, normalizeAccountNumber } from '@/lib/accountUtils';
 
 interface FileUploadProps {
   label: string;
@@ -135,10 +135,9 @@ function parseFile(file: File): Promise<AccountEntry[]> {
         .filter(row => row && (row[nameIdx]?.toString().trim() || (numIdx >= 0 && row[numIdx]?.toString().trim())))
         .map((row, i) => {
           const rawNum = numIdx >= 0 ? row[numIdx]?.toString().trim() : undefined;
-          // Accept account codes with optional separators (1-101, 1.101.01, 1/101) → keep digits only
-          const digits = rawNum ? rawNum.replace(/[^\d]/g, '') : '';
-          const number = digits.length >= 2 && digits.length <= 12 ? digits : undefined;
-          const name = row[nameIdx]?.toString().trim() || number || '';
+          const rawName = row[nameIdx]?.toString().trim() || '';
+          const number = normalizeAccountNumber(rawNum) ?? extractAccountNumber(rawName);
+          const name = rawName || number || '';
           const debit = parseFloat(row[debitIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
           const credit = parseFloat(row[creditIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
           const category = classifyAccount(name, number);
