@@ -114,6 +114,19 @@ export default function Index() {
             )}
             <AccountsTable accounts={currentAccounts} onUpdateCategory={handleUpdateCategory} />
 
+            {isBalanced && !showStatements && (
+              <div className="bg-gradient-to-l from-primary/10 to-accent/10 border-2 border-primary/30 rounded-xl p-6 flex flex-col sm:flex-row items-center justify-between gap-4">
+                <div className="text-center sm:text-right">
+                  <h3 className="text-lg font-bold text-foreground">✅ الميزان متوازن — جاهز للتحليل</h3>
+                  <p className="text-sm text-muted-foreground mt-1">راجع التصنيفات أعلاه ثم أنشئ القوائم المالية والتحليلات الكاملة</p>
+                </div>
+                <Button onClick={() => setShowStatements(true)} size="lg" className="gap-2 shadow-lg">
+                  <FileText className="w-5 h-5" />
+                  إنشاء القوائم والتحليلات
+                </Button>
+              </div>
+            )}
+
             {isBalanced && !hasBudget && (
               <BudgetEntry incomeAccountNames={incomeAccountNames} onBudgetLoaded={setBudgetItems} />
             )}
