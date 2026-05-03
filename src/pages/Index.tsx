@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { AccountEntry, AccountType, suggestAccountType } from '@/lib/accountUtils';
+import { AccountEntry, AccountCategory, classifyAccount, categoryToType } from '@/lib/accountUtils';
 import { BudgetItem } from '@/lib/budgetTypes';
 import FileUpload from '@/components/FileUpload';
 import BalanceSummary from '@/components/BalanceSummary';
@@ -40,15 +40,17 @@ export default function Index() {
     setPreviousAccounts(data.map((a, i) => ({ ...a, id: `prev-${i}` })));
   }, []);
 
-  const handleUpdateType = useCallback((id: string, type: AccountType) => {
-    setCurrentAccounts(prev => prev.map(a => a.id === id ? { ...a, type } : a));
+  const handleUpdateCategory = useCallback((id: string, category: AccountCategory) => {
+    setCurrentAccounts(prev => prev.map(a => a.id === id ? { ...a, category, type: categoryToType(category) } : a));
   }, []);
 
-  const handleAddAdjustment = useCallback((entry: Omit<AccountEntry, 'id' | 'type'>) => {
+  const handleAddAdjustment = useCallback((entry: { name: string; number?: string; debit: number; credit: number }) => {
+    const category = classifyAccount(entry.name, entry.number);
     const newEntry: AccountEntry = {
       ...entry,
       id: `adj-${Date.now()}`,
-      type: suggestAccountType(entry.name),
+      category,
+      type: categoryToType(category),
     };
     setCurrentAccounts(prev => [...prev, newEntry]);
     setShowStatements(false);
@@ -110,7 +112,7 @@ export default function Index() {
             {!isBalanced && (
               <AdjustmentEntry onAdd={handleAddAdjustment} difference={difference} />
             )}
-            <AccountsTable accounts={currentAccounts} onUpdateType={handleUpdateType} />
+            <AccountsTable accounts={currentAccounts} onUpdateCategory={handleUpdateCategory} />
 
             {isBalanced && !hasBudget && (
               <BudgetEntry incomeAccountNames={incomeAccountNames} onBudgetLoaded={setBudgetItems} />
