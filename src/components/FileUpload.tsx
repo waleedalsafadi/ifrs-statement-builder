@@ -110,20 +110,34 @@ function parseFile(file: File): Promise<AccountEntry[]> {
       }
       if (rows.length === 0) return resolve([]);
 
-      const cols = detectColumns(rows[0]);
-      // Fallback positional layout: [name, debit, credit] or [number, name, debit, credit]
-      const nameIdx = cols.name >= 0 ? cols.name : (cols.num >= 0 ? 1 : 0);
-      const debitIdx = cols.debit >= 0 ? cols.debit : (cols.num >= 0 ? 2 : 1);
-      const creditIdx = cols.credit >= 0 ? cols.credit : (cols.num >= 0 ? 3 : 2);
-      const numIdx = cols.num;
+      const headerExists = isHeaderRow(rows[0]);
+      const dataRows = headerExists ? rows.slice(1) : rows;
+      const headerCols = headerExists
+        ? detectColumnsFromHeader(rows[0])
+        : { num: -1, name: -1, debit: -1, credit: -1 };
+      const contentCols = detectColumnsFromContent(dataRows);
+      const cols = {
+        num: headerCols.num >= 0 ? headerCols.num : contentCols.num,
+        name: headerCols.name >= 0 ? headerCols.name : contentCols.name,
+        debit: headerCols.debit >= 0 ? headerCols.debit : contentCols.debit,
+        credit: headerCols.credit >= 0 ? headerCols.credit : contentCols.credit,
+      };
 
-      const accounts: AccountEntry[] = rows.slice(1)
-        .filter(row => row && (row[nameIdx]?.toString().trim() || row[numIdx]?.toString().trim()))
+      // Final fallbacks: positional layout
+      const numIdx = cols.num;
+      const nameIdx = cols.name >= 0 ? cols.name : (numIdx >= 0 ? (numIdx === 0 ? 1 : 0) : 0);
+      const debitIdx = cols.debit >= 0 ? cols.debit : 2;
+      const creditIdx = cols.credit >= 0 ? cols.credit : 3;
+
+      const accounts: AccountEntry[] = dataRows
+        .filter(row => row && (row[nameIdx]?.toString().trim() || (numIdx >= 0 && row[numIdx]?.toString().trim())))
         .map((row, i) => {
-          const number = numIdx >= 0 ? row[numIdx]?.toString().trim() : undefined;
+          const rawNum = numIdx >= 0 ? row[numIdx]?.toString().trim() : undefined;
+          // Only treat as account number if it looks like a code (digits only, length 2-12)
+          const number = rawNum && /^\d{2,12}$/.test(rawNum) ? rawNum : undefined;
           const name = row[nameIdx]?.toString().trim() || number || '';
-          const debit = parseFloat(row[debitIdx]?.toString().replace(/,/g, '') || '0') || 0;
-          const credit = parseFloat(row[creditIdx]?.toString().replace(/,/g, '') || '0') || 0;
+          const debit = parseFloat(row[debitIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
+          const credit = parseFloat(row[creditIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
           const category = classifyAccount(name, number);
           return {
             id: `acc-${i}`,
