@@ -346,7 +346,8 @@ function categoryFromNameOnly(name: string): AccountCategory {
 // ---------- Public classification entry ----------
 export function classifyAccount(name: string, number?: string): AccountCategory {
   const lname = (name || '').toLowerCase();
-  const bucket = bucketFromNumber(number);
+  const detectedNumber = normalizeAccountNumber(number) ?? extractAccountNumber(name);
+  const bucket = bucketFromNumber(detectedNumber);
   if (bucket) return refineWithName(bucket, lname);
   return categoryFromNameOnly(name || '');
 }
