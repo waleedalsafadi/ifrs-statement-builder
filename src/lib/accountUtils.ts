@@ -186,13 +186,28 @@ function hasAny(text: string, kws: string[]): boolean {
 
 // ---------- Number-prefix → broad bucket ----------
 type Bucket =
-  | 'NCA' | 'CA'
-  | 'NCL' | 'CL'
+  | 'ASSET' | 'NCA' | 'CA'
+  | 'LIAB' | 'NCL' | 'CL'
   | 'EQ' | 'REV' | 'COGS' | 'OPEX' | 'FIN' | 'TAX' | 'MEMO' | null;
 
+export function normalizeAccountNumber(value?: string): string | undefined {
+  if (!value) return undefined;
+  const normalized = value
+    .replace(/[٠-٩]/g, d => String(d.charCodeAt(0) - 1632))
+    .replace(/[۰-۹]/g, d => String(d.charCodeAt(0) - 1776))
+    .replace(/[^0-9]/g, '');
+  return normalized.length >= 1 && normalized.length <= 12 ? normalized : undefined;
+}
+
+export function extractAccountNumber(text?: string): string | undefined {
+  if (!text) return undefined;
+  const match = text.match(/(?:^|\s)([0-9٠-٩۰-۹][0-9٠-٩۰-۹\-./]{0,14})(?=\s|$)/);
+  return normalizeAccountNumber(match?.[1]);
+}
+
 export function bucketFromNumber(num?: string): Bucket {
-  if (!num) return null;
-  const n = num.trim();
+  const n = normalizeAccountNumber(num);
+  if (!n) return null;
   if (!/^\d/.test(n)) return null;
   const d1 = n[0];
   const d2 = n[1] ?? '';
@@ -200,11 +215,11 @@ export function bucketFromNumber(num?: string): Bucket {
     case '1':
       if (d2 === '1') return 'NCA';
       if (d2 === '2') return 'CA';
-      return 'CA';
+      return 'ASSET';
     case '2':
       if (d2 === '1') return 'NCL';
       if (d2 === '2') return 'CL';
-      return 'CL';
+      return 'LIAB';
     case '3': return 'EQ';
     case '4': return 'REV';
     case '5': return 'COGS';
