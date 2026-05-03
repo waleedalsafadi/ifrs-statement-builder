@@ -133,8 +133,9 @@ function parseFile(file: File): Promise<AccountEntry[]> {
         .filter(row => row && (row[nameIdx]?.toString().trim() || (numIdx >= 0 && row[numIdx]?.toString().trim())))
         .map((row, i) => {
           const rawNum = numIdx >= 0 ? row[numIdx]?.toString().trim() : undefined;
-          // Only treat as account number if it looks like a code (digits only, length 2-12)
-          const number = rawNum && /^\d{2,12}$/.test(rawNum) ? rawNum : undefined;
+          // Accept account codes with optional separators (1-101, 1.101.01, 1/101) → keep digits only
+          const digits = rawNum ? rawNum.replace(/[^\d]/g, '') : '';
+          const number = digits.length >= 2 && digits.length <= 12 ? digits : undefined;
           const name = row[nameIdx]?.toString().trim() || number || '';
           const debit = parseFloat(row[debitIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
           const credit = parseFloat(row[creditIdx]?.toString().replace(/[,()]/g, '') || '0') || 0;
