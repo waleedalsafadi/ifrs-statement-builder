@@ -1,16 +1,16 @@
 import { useState } from 'react';
-import { AccountEntry, suggestAccountType } from '@/lib/accountUtils';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Plus } from 'lucide-react';
 
 interface AdjustmentEntryProps {
-  onAdd: (entry: Omit<AccountEntry, 'id' | 'type'>) => void;
+  onAdd: (entry: { name: string; number?: string; debit: number; credit: number }) => void;
   difference: number;
 }
 
 export default function AdjustmentEntry({ onAdd, difference }: AdjustmentEntryProps) {
   const [name, setName] = useState('');
+  const [number, setNumber] = useState('');
   const [debit, setDebit] = useState('');
   const [credit, setCredit] = useState('');
 
@@ -18,12 +18,11 @@ export default function AdjustmentEntry({ onAdd, difference }: AdjustmentEntryPr
     if (!name.trim()) return;
     onAdd({
       name: name.trim(),
+      number: number.trim() || undefined,
       debit: parseFloat(debit) || 0,
       credit: parseFloat(credit) || 0,
     });
-    setName('');
-    setDebit('');
-    setCredit('');
+    setName(''); setNumber(''); setDebit(''); setCredit('');
   };
 
   return (
@@ -33,6 +32,10 @@ export default function AdjustmentEntry({ onAdd, difference }: AdjustmentEntryPr
         الفرق: {Math.abs(difference).toLocaleString('en-US', { minimumFractionDigits: 2 })} — أضف قيد تسوية لإصلاح الفرق
       </p>
       <div className="flex flex-wrap gap-3 items-end">
+        <div className="w-32">
+          <label className="text-xs text-muted-foreground mb-1 block">رقم الحساب</label>
+          <Input value={number} onChange={e => setNumber(e.target.value)} placeholder="مثال: 1201" className="h-9 font-mono" dir="ltr" />
+        </div>
         <div className="flex-1 min-w-[180px]">
           <label className="text-xs text-muted-foreground mb-1 block">اسم الحساب</label>
           <Input value={name} onChange={e => setName(e.target.value)} placeholder="مثال: تسوية" className="h-9" />
